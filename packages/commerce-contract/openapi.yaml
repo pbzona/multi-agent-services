@@ -1,0 +1,1110 @@
+openapi: 3.1.0
+info:
+  title: Desk and Home Commerce API
+  version: 1.0.0
+  description: >-
+    Canonical private API contract for browsing desk and home products, managing
+    the authenticated customer's cart and orders, and administering products and
+    inventory. Customer identity and authorization are always derived from the
+    bearer token.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: Catalog
+    description: Customer-visible product catalog operations.
+  - name: Cart
+    description: Operations on the authenticated customer's cart.
+  - name: Orders
+    description: Operations on the authenticated customer's orders.
+  - name: Admin
+    description: Administrative product and inventory operations.
+  - name: System
+    description: Service health and contract discovery endpoints.
+paths:
+  /api/health:
+    get:
+      tags:
+        - System
+      summary: Get service health
+      description: Reports whether the commerce API is ready to serve traffic.
+      security: []
+      responses:
+        "200":
+          description: The service is healthy.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+        "503":
+          description: The service is not ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /api/openapi.json:
+    get:
+      tags:
+        - System
+      summary: Get the OpenAPI contract
+      description: Returns the canonical OpenAPI document served by this API.
+      security: []
+      responses:
+        "200":
+          description: The canonical OpenAPI 3.1 document.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OpenApiDocument"
+  /api/v1/products:
+    get:
+      tags:
+        - Catalog
+      summary: List products
+      description: Lists active products for web and customer callers. Admin callers can also see draft and archived products.
+      operationId: listProducts
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/CategoryQuery"
+        - $ref: "#/components/parameters/InStockQuery"
+      responses:
+        "200":
+          description: A bounded page of products.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/products/{slug}:
+    get:
+      tags:
+        - Catalog
+      summary: Get a product
+      description: Gets an active product by slug for web and customer callers. Admin callers can also retrieve draft and archived products.
+      operationId: getProduct
+      parameters:
+        - $ref: "#/components/parameters/SlugPath"
+      responses:
+        "200":
+          description: The requested product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/cart:
+    get:
+      tags:
+        - Cart
+      summary: Get the current cart
+      description: Gets the cart belonging to the authenticated customer.
+      operationId: getCurrentCart
+      responses:
+        "200":
+          description: The authenticated customer's cart.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/cart/items/{variantId}:
+    put:
+      tags:
+        - Cart
+      summary: Set a cart item quantity
+      description: >-
+        Sets the desired absolute quantity for a variant in the authenticated
+        customer's cart. A quantity of zero removes the item. This operation never
+        interprets quantity as an increment or decrement.
+      operationId: setCartItemQuantity
+      parameters:
+        - $ref: "#/components/parameters/VariantIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetCartItemQuantityInput"
+      responses:
+        "200":
+          description: The updated cart.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/orders:
+    get:
+      tags:
+        - Orders
+      summary: List current customer orders
+      description: Lists orders belonging to the authenticated customer.
+      operationId: listCurrentCustomerOrders
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+      responses:
+        "200":
+          description: A bounded page of the authenticated customer's orders.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/orders/{orderNumber}:
+    get:
+      tags:
+        - Orders
+      summary: Get a current customer order
+      description: >-
+        Gets an order by number only when it belongs to the authenticated customer.
+      operationId: getCurrentCustomerOrder
+      parameters:
+        - $ref: "#/components/parameters/OrderNumberPath"
+      responses:
+        "200":
+          description: The requested customer order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/admin/inventory:
+    get:
+      tags:
+        - Admin
+      summary: List inventory
+      description: Lists bounded inventory records for an authenticated administrator.
+      operationId: listInventory
+      parameters:
+        - $ref: "#/components/parameters/LimitQuery"
+        - $ref: "#/components/parameters/CursorQuery"
+        - $ref: "#/components/parameters/SearchQuery"
+        - $ref: "#/components/parameters/LowStockQuery"
+      responses:
+        "200":
+          description: A bounded page of inventory records.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryPage"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/admin/products/{productId}:
+    patch:
+      tags:
+        - Admin
+      summary: Update a product
+      description: Updates mutable catalog fields for a product.
+      operationId: updateProduct
+      parameters:
+        - $ref: "#/components/parameters/ProductIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProductInput"
+      responses:
+        "200":
+          description: The updated product.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/ServerError"
+  /api/v1/admin/inventory/{variantId}:
+    put:
+      tags:
+        - Admin
+      summary: Set an inventory level
+      description: >-
+        Sets the desired absolute on-hand quantity for a variant. expectedVersion
+        provides optimistic concurrency control and must match the current record
+        version. Quantity is never interpreted as an adjustment.
+      operationId: setInventoryLevel
+      parameters:
+        - $ref: "#/components/parameters/VariantIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetInventoryLevelInput"
+      responses:
+        "200":
+          description: The updated inventory record with its new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryItem"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/ServerError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: A short-lived commerce access token.
+  parameters:
+    LimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of records to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    CursorQuery:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned by a previous page.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 256
+    SearchQuery:
+      name: query
+      in: query
+      required: false
+      description: Case-insensitive product name, slug, or SKU search text.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+    CategoryQuery:
+      name: category
+      in: query
+      required: false
+      description: Exact category slug to include.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 80
+        pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    InStockQuery:
+      name: inStock
+      in: query
+      required: false
+      description: When true, only include products with an available variant.
+      schema:
+        type: boolean
+    LowStockQuery:
+      name: lowStock
+      in: query
+      required: false
+      description: When true, only include inventory at or below its threshold.
+      schema:
+        type: boolean
+    SlugPath:
+      name: slug
+      in: path
+      required: true
+      description: Public product slug.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    VariantIdPath:
+      name: variantId
+      in: path
+      required: true
+      description: Stable product variant identifier.
+      schema:
+        type: string
+        minLength: 5
+        maxLength: 64
+        pattern: "^var_[A-Za-z0-9]+$"
+    ProductIdPath:
+      name: productId
+      in: path
+      required: true
+      description: Stable product identifier.
+      schema:
+        type: string
+        minLength: 6
+        maxLength: 64
+        pattern: "^prod_[A-Za-z0-9]+$"
+    OrderNumberPath:
+      name: orderNumber
+      in: path
+      required: true
+      description: Customer-facing order number.
+      schema:
+        type: string
+        minLength: 12
+        maxLength: 28
+        pattern: "^ORD-[A-Z0-9]{8,24}$"
+  responses:
+    BadRequest:
+      description: The request is malformed or fails validation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: A valid bearer token is required.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: The authenticated principal cannot perform this operation.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: The requested resource does not exist or is not visible to the caller.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: The request conflicts with current inventory or resource state.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServerError:
+      description: The service could not complete the request.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    HealthStatus:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - version
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+            - degraded
+          maxLength: 16
+        version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        timestamp:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+    OpenApiDocument:
+      type: object
+      description: A bounded top-level representation of the served OpenAPI document.
+      maxProperties: 32
+      required:
+        - openapi
+        - info
+        - paths
+      properties:
+        openapi:
+          type: string
+          const: 3.1.0
+          maxLength: 16
+        info:
+          $ref: "#/components/schemas/OpenApiInfo"
+        servers:
+          type: array
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/OpenApiServer"
+        security:
+          type: array
+          maxItems: 16
+          items:
+            $ref: "#/components/schemas/OpenApiSecurityRequirement"
+        tags:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/OpenApiTag"
+        paths:
+          type: object
+          maxProperties: 1000
+          additionalProperties:
+            type: object
+            maxProperties: 16
+            additionalProperties: true
+        components:
+          type: object
+          maxProperties: 32
+          additionalProperties: true
+      additionalProperties: true
+    OpenApiInfo:
+      type: object
+      additionalProperties: false
+      maxProperties: 16
+      required:
+        - title
+        - version
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        version:
+          type: string
+          minLength: 1
+          maxLength: 64
+        description:
+          type: string
+          maxLength: 5000
+    OpenApiServer:
+      type: object
+      additionalProperties: false
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          minLength: 1
+          maxLength: 2048
+    OpenApiSecurityRequirement:
+      type: object
+      maxProperties: 16
+      additionalProperties:
+        type: array
+        maxItems: 32
+        items:
+          type: string
+          maxLength: 200
+    OpenApiTag:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 1000
+    Money:
+      type: object
+      additionalProperties: false
+      required:
+        - amount
+        - currency
+      properties:
+        amount:
+          type: integer
+          description: Monetary amount in the currency's minor unit.
+          minimum: 0
+          maximum: 999999999
+        currency:
+          type: string
+          description: ISO 4217 currency code.
+          minLength: 3
+          maxLength: 3
+          pattern: "^[A-Z]{3}$"
+    ProductOption:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        value:
+          type: string
+          minLength: 1
+          maxLength: 120
+    ProductImage:
+      type: object
+      additionalProperties: false
+      required:
+        - url
+        - alt
+      properties:
+        url:
+          type: string
+          format: uri-reference
+          minLength: 1
+          maxLength: 2048
+        alt:
+          type: string
+          maxLength: 300
+    ProductVariant:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - sku
+        - name
+        - options
+        - price
+        - availableQuantity
+      properties:
+        id:
+          type: string
+          minLength: 5
+          maxLength: 64
+          pattern: "^var_[A-Za-z0-9]+$"
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 80
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        options:
+          type: array
+          maxItems: 10
+          items:
+            $ref: "#/components/schemas/ProductOption"
+        price:
+          $ref: "#/components/schemas/Money"
+        availableQuantity:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+    Product:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - slug
+        - name
+        - description
+        - category
+        - status
+        - images
+        - variants
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          minLength: 6
+          maxLength: 64
+          pattern: "^prod_[A-Za-z0-9]+$"
+        slug:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 80
+        status:
+          type: string
+          enum:
+            - draft
+            - active
+            - archived
+          maxLength: 16
+        images:
+          type: array
+          maxItems: 12
+          items:
+            $ref: "#/components/schemas/ProductImage"
+        variants:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/ProductVariant"
+        createdAt:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+        updatedAt:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+    ProductPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/Product"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 256
+    CartItem:
+      type: object
+      additionalProperties: false
+      required:
+        - variantId
+        - sku
+        - productSlug
+        - productName
+        - variantName
+        - imageUrl
+        - quantity
+        - unitPrice
+        - lineTotal
+      properties:
+        variantId:
+          type: string
+          minLength: 5
+          maxLength: 64
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 80
+        productSlug:
+          type: string
+          minLength: 1
+          maxLength: 128
+        productName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        variantName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        imageUrl:
+          type:
+            - string
+            - "null"
+          format: uri
+          maxLength: 2048
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 999
+        unitPrice:
+          $ref: "#/components/schemas/Money"
+        lineTotal:
+          $ref: "#/components/schemas/Money"
+    Cart:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - items
+        - itemCount
+        - subtotal
+        - version
+        - updatedAt
+      properties:
+        id:
+          type: string
+          minLength: 6
+          maxLength: 64
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/CartItem"
+        itemCount:
+          type: integer
+          minimum: 0
+          maximum: 99900
+        subtotal:
+          $ref: "#/components/schemas/Money"
+        version:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        updatedAt:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+    SetCartItemQuantityInput:
+      type: object
+      additionalProperties: false
+      required:
+        - quantity
+      properties:
+        quantity:
+          type: integer
+          description: Desired final cart quantity. Zero removes the item.
+          minimum: 0
+          maximum: 999
+    OrderItem:
+      type: object
+      additionalProperties: false
+      required:
+        - variantId
+        - sku
+        - productSlug
+        - productName
+        - variantName
+        - quantity
+        - unitPrice
+        - lineTotal
+      properties:
+        variantId:
+          type: string
+          minLength: 5
+          maxLength: 64
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 80
+        productSlug:
+          type: string
+          minLength: 1
+          maxLength: 128
+        productName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        variantName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 999
+        unitPrice:
+          $ref: "#/components/schemas/Money"
+        lineTotal:
+          $ref: "#/components/schemas/Money"
+    Order:
+      type: object
+      additionalProperties: false
+      required:
+        - orderNumber
+        - status
+        - items
+        - subtotal
+        - shipping
+        - tax
+        - total
+        - placedAt
+        - updatedAt
+      properties:
+        orderNumber:
+          type: string
+          minLength: 12
+          maxLength: 28
+          pattern: "^ORD-[A-Z0-9]{8,24}$"
+        status:
+          type: string
+          enum:
+            - pending
+            - confirmed
+            - processing
+            - shipped
+            - delivered
+            - cancelled
+          maxLength: 16
+        items:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        subtotal:
+          $ref: "#/components/schemas/Money"
+        shipping:
+          $ref: "#/components/schemas/Money"
+        tax:
+          $ref: "#/components/schemas/Money"
+        total:
+          $ref: "#/components/schemas/Money"
+        placedAt:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+        updatedAt:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+    OrderPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/Order"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 256
+    InventoryItem:
+      type: object
+      additionalProperties: false
+      required:
+        - variantId
+        - productId
+        - sku
+        - productName
+        - variantName
+        - quantity
+        - reservedQuantity
+        - availableQuantity
+        - lowStockThreshold
+        - version
+        - updatedAt
+      properties:
+        variantId:
+          type: string
+          minLength: 5
+          maxLength: 64
+        productId:
+          type: string
+          minLength: 6
+          maxLength: 64
+        sku:
+          type: string
+          minLength: 1
+          maxLength: 80
+        productName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        variantName:
+          type: string
+          minLength: 1
+          maxLength: 160
+        quantity:
+          type: integer
+          description: Absolute on-hand quantity.
+          minimum: 0
+          maximum: 1000000
+        reservedQuantity:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        availableQuantity:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        lowStockThreshold:
+          type: integer
+          minimum: 0
+          maximum: 1000000
+        state:
+          type: string
+          enum:
+            - in_stock
+            - low_stock
+            - out_of_stock
+            - backorder
+        version:
+          type: integer
+          minimum: 0
+          maximum: 2147483647
+        updatedAt:
+          type: string
+          format: date-time
+          minLength: 20
+          maxLength: 40
+    InventoryPage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/InventoryItem"
+        nextCursor:
+          type:
+            - string
+            - "null"
+          minLength: 1
+          maxLength: 256
+    UpdateProductInput:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 160
+        description:
+          type: string
+          maxLength: 5000
+        category:
+          type: string
+          minLength: 1
+          maxLength: 80
+        status:
+          type: string
+          enum:
+            - draft
+            - active
+            - archived
+          maxLength: 16
+        imageUrls:
+          type: array
+          maxItems: 12
+          items:
+            type: string
+            format: uri-reference
+            minLength: 1
+            maxLength: 2048
+    SetInventoryLevelInput:
+      type: object
+      additionalProperties: false
+      required:
+        - quantity
+        - expectedVersion
+      properties:
+        quantity:
+          type: integer
+          description: Desired final on-hand quantity, not an adjustment.
+          minimum: 0
+          maximum: 1000000
+        expectedVersion:
+          type: integer
+          description: Inventory version observed before this update.
+          minimum: 1
+          maximum: 2147483647
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: "#/components/schemas/ApiError"
+    ApiError:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+        - requestId
+      properties:
+        code:
+          type: string
+          enum:
+            - BAD_REQUEST
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - NOT_FOUND
+            - CONFLICT
+              - OUT_OF_STOCK
+              - VERSION_MISMATCH
+              - COMMERCE_UNAVAILABLE
+          maxLength: 32
+        message:
+          type: string
+          minLength: 1
+          maxLength: 500
+        requestId:
+          type: string
+          minLength: 1
+          maxLength: 128

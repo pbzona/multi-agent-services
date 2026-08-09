@@ -1,0 +1,21 @@
+{
+  "name": "multi-eve",
+  "apps": {
+    "apps/web": {
+      "name": "multi-eve",
+      "script": "dev:app"
+    },
+    "apps/customer-agent": {
+      "name": "customer.multi-eve",
+      "script": "dev:app"
+    },
+    "apps/admin-agent": {
+      "name": "admin.multi-eve",
+      "script": "dev:app"
+    },
+    "apps/commerce": {
+      "name": "commerce.multi-eve",
+      "script": "dev:app"
+    }
+  }
+}

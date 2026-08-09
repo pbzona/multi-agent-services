@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/create-next-app).
+# Field & Form storefront
 
-## Getting Started
+`apps/web` owns the Next.js 16 storefront, demo persona cookie, server-rendered commerce views, cart Server Actions, and browser clients for the two Eve root agents.
 
-First, run the development server:
+The app does not access PostgreSQL. Server-only code calls the private `commerce` service with the generated `COMMERCE_URL` binding and short-lived commerce JWTs.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Service ownership
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| Identifier        | Value                           |
+| ----------------- | ------------------------------- |
+| Workspace package | `web`                           |
+| Vercel service    | `web`                           |
+| Framework         | Next.js 16.3.0                  |
+| Public rewrite    | `/(.*)` after both Eve rewrites |
+| Outbound binding  | `COMMERCE_URL` to `commerce`    |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The named agent paths are owned by `eve-customer` and `eve-admin`, not Next.js. `useEveAgent({ agent: "customer" })` and `useEveAgent({ agent: "admin" })` call those same-origin public routes through Vercel's top-level routing.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load Inter, a custom Google Font.
+## Routes
 
-## Learn More
+| Route                      | Ownership                                       |
+| -------------------------- | ----------------------------------------------- |
+| `/`                        | Product catalog                                 |
+| `/products/[slug]`         | Product details and add-to-cart form            |
+| `/cart`                    | Customer cart and quantity actions              |
+| `/account/orders`          | Current customer's order list                   |
+| `/account/orders/[number]` | Current customer's order detail                 |
+| `/admin`                   | Role-gated inventory view and admin agent panel |
+| `POST /api/persona`        | Demo-only customer or admin cookie switch       |
 
-To learn more about Next.js, take a look at the following resources:
+`proxy.ts` creates a customer demo session for normal web routes when no valid cookie exists. It excludes `/eve/`, so each Eve service authenticates its own requests.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Run package commands from `apps/web`:
 
-## Deploy on Vercel
+| Command            | Purpose                                                                  |
+| ------------------ | ------------------------------------------------------------------------ |
+| `pnpm dev`         | Start the component through Portless at `https://multi-eve.localhost`    |
+| `pnpm dev:app`     | Start raw Next.js; used by Portless and the Vercel Services `devCommand` |
+| `pnpm lint`        | Run the package lint task                                                |
+| `pnpm check-types` | Generate Next.js route types and run TypeScript                          |
+| `pnpm build`       | Create the production Next.js build                                      |
+| `pnpm start`       | Start the production build                                               |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+From the repository root, use `pnpm --filter web <command>` for one package. Root `pnpm dev` starts every component host through Turbo and the central `portless.json`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Use root `pnpm dev:services` for integrated development at [https://multi-eve.localhost](https://multi-eve.localhost). The standalone web host does not receive `COMMERCE_URL` and does not include the named Eve route table. `dev:app` remains raw so the outer Portless process can pass its `PORT` and `HOST` to Vercel CLI without nesting another proxy.
+
+## Caveats
+
+- `POST /api/persona` grants either fixed demo role without identity proof.
+- The app uses a shared HMAC demo secret and is not a production auth system.
+- Checkout and payment are intentionally unavailable.
+- Component mode does not test Vercel service rewrites or binding generation.
+
+## Related documentation
+
+- [Getting started](../../docs/getting-started.md)
+- [Architecture](../../docs/architecture.md)
+- [Security and caveats](../../docs/security-and-caveats.md)
+- [Troubleshooting](../../docs/troubleshooting.md)
+- [Portless](https://portless.sh)

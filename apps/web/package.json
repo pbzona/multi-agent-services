@@ -4,17 +4,24 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev --port 3000",
+    "dev": "cross-env PORTLESS_PORT=443 portless",
+    "dev:app": "node ../../scripts/run-with-env.mjs next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint --max-warnings 0",
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
-    "@repo/ui": "workspace:*",
+    "@repo/commerce-contract": "workspace:*",
+    "@repo/demo-auth": "workspace:*",
+    "ai": "^7.0.38",
+    "eve": "^0.29.5",
     "next": "16.3.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",

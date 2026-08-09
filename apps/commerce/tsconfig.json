@@ -1,0 +1,13 @@
+{
+  "extends": "nitro/tsconfig",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": [
+    "drizzle.config.ts",
+    "nitro.config.ts",
+    "server/**/*.ts",
+    "test/**/*.ts"
+  ]
+}

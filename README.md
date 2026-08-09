@@ -1,159 +1,143 @@
-# Turborepo starter
+# Multi-agent services
 
-This Turborepo starter is maintained by the Turborepo core team.
+This template combines a Next.js storefront, two Eve root agents, a private
+Nitro commerce API, and PostgreSQL in one Vercel Services project. The agents
+use an OpenAPI contract to discover commerce operations. Each root exposes a
+different operation set and requires approval for writes.
 
-## Using this example
+> [!WARNING]
+> This is a demonstration, not a production identity or commerce system. Any
+> visitor can select the demo admin persona, make paid model requests, and
+> change shared demo data. The UI displays model reasoning and raw tool data.
+> Do not use real users, secrets, or commerce data.
 
-Run the following command:
-
-```sh
-npx create-turbo@latest
+```mermaid
+flowchart LR
+  Browser[Browser] --> Router[Vercel Services routing]
+  Router --> Web[web: Next.js]
+  Router --> Customer[eve-customer: customer root]
+  Router --> Admin[eve-admin: admin root]
+  Web -->|COMMERCE_URL| Commerce[commerce: private Nitro API]
+  Customer -->|COMMERCE_URL| Commerce
+  Admin -->|COMMERCE_URL| Commerce
+  Commerce -->|DATABASE_URL| Postgres[(PostgreSQL)]
 ```
 
-## What's inside?
+## What the template shows
 
-This Turborepo includes the following packages/apps:
+- `eve-customer` and `eve-admin` are separate top-level Eve agents. The
+  browser addresses each agent directly. Neither agent delegates to the other.
+- `packages/commerce-contract/openapi.yaml` is the source contract. Generated
+  artifacts provide the tools that Eve exposes to each root.
+- Vercel service bindings give `web` and both agents a private URL for
+  `commerce`. Commerce still verifies a short-lived bearer token.
+- AI Gateway uses Vercel OIDC. The two roots send separate reporting tags:
+  `multi-agent-services:customer-agent` and
+  `multi-agent-services:admin-agent`.
 
-### Apps and Packages
+## Service map
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+| Service        | Source                | Public route                    | Role                                        |
+| -------------- | --------------------- | ------------------------------- | ------------------------------------------- |
+| `web`          | `apps/web`            | `/(.*)`                         | Storefront, demo session, and agent clients |
+| `eve-customer` | `apps/customer-agent` | `/eve/agents/customer/eve/v1/*` | Catalog, current cart, and customer orders  |
+| `eve-admin`    | `apps/admin-agent`    | `/eve/agents/admin/eve/v1/*`    | Products and inventory                      |
+| `commerce`     | `apps/commerce`       | None                            | Private API and PostgreSQL access           |
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+## Run it locally
 
-### Utilities
+You need Node.js 24.x, pnpm 10.26.1, PostgreSQL, and a browser. The repository
+includes the Vercel CLI as a pinned workspace dependency. Local setup does not
+start PostgreSQL for you.
 
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+pnpm install
+cp .env.example .env
 ```
 
-Without global `turbo`, use your package manager:
+Set `DATABASE_URL` and a random `DEMO_AUTH_SECRET` with at least 32 characters
+in `.env`. Link the repository root to a Vercel project and pull its OIDC
+environment before running model commands:
 
-```sh
-cd my-turborepo
-npx turbo build
-pnpm dlx turbo build
-pnpm exec turbo build
+```bash
+pnpm exec vercel link
+pnpm exec vercel env pull
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Do not set `AI_GATEWAY_API_KEY`. The agents reject that variable and use Vercel
+OIDC instead.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+Apply the migration and load the disposable demo data:
 
-```sh
-turbo build --filter=docs
+```bash
+pnpm db:migrate
+pnpm db:seed
 ```
 
-Without global `turbo`:
+The seed replaces the reference users, cart, orders, products, and inventory.
+Use a disposable database.
 
-```sh
-npx turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
+Start the browser-facing local HTTPS proxy and the integrated Services flow:
+
+```bash
+pnpm portless:proxy
+pnpm dev:services
 ```
 
-### Develop
+Open the URL printed by Portless. The default main-worktree URL is
+`https://multi-eve.localhost`. Run `pnpm portless:doctor` if the proxy or local
+certificate is not ready.
 
-To develop all apps and packages, run the following command:
+Use `pnpm dev` for independent component work. That mode does not provide
+Vercel rewrites or `COMMERCE_URL` bindings, so it cannot test commerce calls.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+## Try the agents
 
-```sh
-cd my-turborepo
-turbo dev
-```
+1. Open `/` as the default customer persona.
+2. Ask, `What is currently in my cart?`
+3. Ask, `Set the Grid Felt Desk Mat quantity to 2.`
+4. Approve the exact `setCartItemQuantity` request.
+5. Select the admin persona and open `/admin`.
+6. Ask, `Summarize low-stock variants.`
+7. Ask, `Set the Fold Laptop Stand / Black on-hand quantity to 4.`
+8. Approve the exact `setInventoryLevel` request.
 
-Without global `turbo`, use your package manager:
+The cart form sets the final quantity. It does not add to the existing quantity.
+The app has no checkout or payment flow.
 
-```sh
-cd my-turborepo
-npx turbo dev
-pnpm exec turbo dev
-pnpm exec turbo dev
-```
+## Commands
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+| Command                                  | Purpose                                         |
+| ---------------------------------------- | ----------------------------------------------- |
+| `pnpm dev:services`                      | Run the four-service local topology             |
+| `pnpm dev`                               | Run independent component hosts                 |
+| `pnpm test`                              | Run deterministic Vitest suites                 |
+| `pnpm lint`                              | Run configured workspace lint tasks             |
+| `pnpm check-types`                       | Run TypeScript checks                           |
+| `pnpm build`                             | Run configured workspace build tasks            |
+| `pnpm openapi:check`                     | Check generated OpenAPI artifacts for drift     |
+| `pnpm ai:costs`                          | Report current-month Gateway usage by agent tag |
+| `pnpm ai:costs -- 2026-08-01 2026-08-08` | Report a UTC date range                         |
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+The cost report uses the AI Gateway Custom Reporting API. Reporting data can
+take several minutes to appear. The API is account-wide and may charge for
+report queries. The command is also available as
+`npm run ai:costs -- 2026-08-01 2026-08-08`.
 
-```sh
-turbo dev --filter=web
-```
+## Documentation
 
-Without global `turbo`:
+- [Documentation index](docs/README.md)
+- [Get started locally](docs/getting-started.md)
+- [Architecture and request flows](docs/architecture.md)
+- [Eve root agents](docs/eve-root-agents.md)
+- [OpenAPI connection](docs/openapi-connection.md)
+- [Security and caveats](docs/security-and-caveats.md)
+- [Deployment](docs/deployment.md)
+- [Testing and evals](docs/testing-and-evals.md)
+- [Extend the template](docs/extending.md)
+- [Customize the template](docs/customizing.md)
+- [Troubleshooting](docs/troubleshooting.md)
+- [Stock photo sources](docs/stock-photo-credits.md)
 
-```sh
-npx turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-pnpm exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-pnpm exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+The source code uses the MIT License. See [LICENSE](LICENSE) and
+[third-party notices](THIRD-PARTY-NOTICES.md).

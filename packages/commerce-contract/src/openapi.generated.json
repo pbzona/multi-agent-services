@@ -1,0 +1,1059 @@
+{
+  "components": {
+    "parameters": {
+      "CategoryQuery": {
+        "description": "Exact category slug to include.",
+        "in": "query",
+        "name": "category",
+        "required": false,
+        "schema": {
+          "maxLength": 80,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        }
+      },
+      "CursorQuery": {
+        "description": "Opaque cursor returned by a previous page.",
+        "in": "query",
+        "name": "cursor",
+        "required": false,
+        "schema": { "maxLength": 256, "minLength": 1, "type": "string" }
+      },
+      "InStockQuery": {
+        "description": "When true, only include products with an available variant.",
+        "in": "query",
+        "name": "inStock",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      "LimitQuery": {
+        "description": "Maximum number of records to return.",
+        "in": "query",
+        "name": "limit",
+        "required": false,
+        "schema": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "LowStockQuery": {
+        "description": "When true, only include inventory at or below its threshold.",
+        "in": "query",
+        "name": "lowStock",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      "OrderNumberPath": {
+        "description": "Customer-facing order number.",
+        "in": "path",
+        "name": "orderNumber",
+        "required": true,
+        "schema": {
+          "maxLength": 28,
+          "minLength": 12,
+          "pattern": "^ORD-[A-Z0-9]{8,24}$",
+          "type": "string"
+        }
+      },
+      "ProductIdPath": {
+        "description": "Stable product identifier.",
+        "in": "path",
+        "name": "productId",
+        "required": true,
+        "schema": {
+          "maxLength": 64,
+          "minLength": 6,
+          "pattern": "^prod_[A-Za-z0-9]+$",
+          "type": "string"
+        }
+      },
+      "SearchQuery": {
+        "description": "Case-insensitive product name, slug, or SKU search text.",
+        "in": "query",
+        "name": "query",
+        "required": false,
+        "schema": { "maxLength": 100, "minLength": 1, "type": "string" }
+      },
+      "SlugPath": {
+        "description": "Public product slug.",
+        "in": "path",
+        "name": "slug",
+        "required": true,
+        "schema": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "type": "string"
+        }
+      },
+      "VariantIdPath": {
+        "description": "Stable product variant identifier.",
+        "in": "path",
+        "name": "variantId",
+        "required": true,
+        "schema": {
+          "maxLength": 64,
+          "minLength": 5,
+          "pattern": "^var_[A-Za-z0-9]+$",
+          "type": "string"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        },
+        "description": "The request is malformed or fails validation."
+      },
+      "Conflict": {
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        },
+        "description": "The request conflicts with current inventory or resource state."
+      },
+      "Forbidden": {
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        },
+        "description": "The authenticated principal cannot perform this operation."
+      },
+      "NotFound": {
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        },
+        "description": "The requested resource does not exist or is not visible to the caller."
+      },
+      "ServerError": {
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        },
+        "description": "The service could not complete the request."
+      },
+      "Unauthorized": {
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" }
+          }
+        },
+        "description": "A valid bearer token is required."
+      }
+    },
+    "schemas": {
+      "ApiError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "BAD_REQUEST",
+              "UNAUTHORIZED",
+              "FORBIDDEN",
+              "NOT_FOUND",
+              "CONFLICT - OUT_OF_STOCK - VERSION_MISMATCH - COMMERCE_UNAVAILABLE"
+            ],
+            "maxLength": 32,
+            "type": "string"
+          },
+          "message": { "maxLength": 500, "minLength": 1, "type": "string" },
+          "requestId": { "maxLength": 128, "minLength": 1, "type": "string" }
+        },
+        "required": ["code", "message", "requestId"],
+        "type": "object"
+      },
+      "Cart": {
+        "additionalProperties": false,
+        "properties": {
+          "id": { "maxLength": 64, "minLength": 6, "type": "string" },
+          "itemCount": { "maximum": 99900, "minimum": 0, "type": "integer" },
+          "items": {
+            "items": { "$ref": "#/components/schemas/CartItem" },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "subtotal": { "$ref": "#/components/schemas/Money" },
+          "updatedAt": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          },
+          "version": { "maximum": 2147483647, "minimum": 0, "type": "integer" }
+        },
+        "required": [
+          "id",
+          "items",
+          "itemCount",
+          "subtotal",
+          "version",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "CartItem": {
+        "additionalProperties": false,
+        "properties": {
+          "imageUrl": {
+            "format": "uri",
+            "maxLength": 2048,
+            "type": ["string", "null"]
+          },
+          "lineTotal": { "$ref": "#/components/schemas/Money" },
+          "productName": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "productSlug": { "maxLength": 128, "minLength": 1, "type": "string" },
+          "quantity": { "maximum": 999, "minimum": 1, "type": "integer" },
+          "sku": { "maxLength": 80, "minLength": 1, "type": "string" },
+          "unitPrice": { "$ref": "#/components/schemas/Money" },
+          "variantId": { "maxLength": 64, "minLength": 5, "type": "string" },
+          "variantName": { "maxLength": 160, "minLength": 1, "type": "string" }
+        },
+        "required": [
+          "variantId",
+          "sku",
+          "productSlug",
+          "productName",
+          "variantName",
+          "imageUrl",
+          "quantity",
+          "unitPrice",
+          "lineTotal"
+        ],
+        "type": "object"
+      },
+      "ErrorResponse": {
+        "additionalProperties": false,
+        "properties": { "error": { "$ref": "#/components/schemas/ApiError" } },
+        "required": ["error"],
+        "type": "object"
+      },
+      "HealthStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": ["ok", "degraded"],
+            "maxLength": 16,
+            "type": "string"
+          },
+          "timestamp": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          },
+          "version": { "maxLength": 64, "minLength": 1, "type": "string" }
+        },
+        "required": ["status", "version", "timestamp"],
+        "type": "object"
+      },
+      "InventoryItem": {
+        "additionalProperties": false,
+        "properties": {
+          "availableQuantity": {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lowStockThreshold": {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "productId": { "maxLength": 64, "minLength": 6, "type": "string" },
+          "productName": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "quantity": {
+            "description": "Absolute on-hand quantity.",
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "reservedQuantity": {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "sku": { "maxLength": 80, "minLength": 1, "type": "string" },
+          "state": {
+            "enum": ["in_stock", "low_stock", "out_of_stock", "backorder"],
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          },
+          "variantId": { "maxLength": 64, "minLength": 5, "type": "string" },
+          "variantName": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "version": { "maximum": 2147483647, "minimum": 0, "type": "integer" }
+        },
+        "required": [
+          "variantId",
+          "productId",
+          "sku",
+          "productName",
+          "variantName",
+          "quantity",
+          "reservedQuantity",
+          "availableQuantity",
+          "lowStockThreshold",
+          "version",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "InventoryPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": { "$ref": "#/components/schemas/InventoryItem" },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "Money": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "description": "Monetary amount in the currency's minor unit.",
+            "maximum": 999999999,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "currency": {
+            "description": "ISO 4217 currency code.",
+            "maxLength": 3,
+            "minLength": 3,
+            "pattern": "^[A-Z]{3}$",
+            "type": "string"
+          }
+        },
+        "required": ["amount", "currency"],
+        "type": "object"
+      },
+      "OpenApiDocument": {
+        "additionalProperties": true,
+        "description": "A bounded top-level representation of the served OpenAPI document.",
+        "maxProperties": 32,
+        "properties": {
+          "components": {
+            "additionalProperties": true,
+            "maxProperties": 32,
+            "type": "object"
+          },
+          "info": { "$ref": "#/components/schemas/OpenApiInfo" },
+          "openapi": { "const": "3.1.0", "maxLength": 16, "type": "string" },
+          "paths": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "maxProperties": 16,
+              "type": "object"
+            },
+            "maxProperties": 1000,
+            "type": "object"
+          },
+          "security": {
+            "items": {
+              "$ref": "#/components/schemas/OpenApiSecurityRequirement"
+            },
+            "maxItems": 16,
+            "type": "array"
+          },
+          "servers": {
+            "items": { "$ref": "#/components/schemas/OpenApiServer" },
+            "maxItems": 16,
+            "type": "array"
+          },
+          "tags": {
+            "items": { "$ref": "#/components/schemas/OpenApiTag" },
+            "maxItems": 64,
+            "type": "array"
+          }
+        },
+        "required": ["openapi", "info", "paths"],
+        "type": "object"
+      },
+      "OpenApiInfo": {
+        "additionalProperties": false,
+        "maxProperties": 16,
+        "properties": {
+          "description": { "maxLength": 5000, "type": "string" },
+          "title": { "maxLength": 200, "minLength": 1, "type": "string" },
+          "version": { "maxLength": 64, "minLength": 1, "type": "string" }
+        },
+        "required": ["title", "version"],
+        "type": "object"
+      },
+      "OpenApiSecurityRequirement": {
+        "additionalProperties": {
+          "items": { "maxLength": 200, "type": "string" },
+          "maxItems": 32,
+          "type": "array"
+        },
+        "maxProperties": 16,
+        "type": "object"
+      },
+      "OpenApiServer": {
+        "additionalProperties": false,
+        "properties": {
+          "url": { "maxLength": 2048, "minLength": 1, "type": "string" }
+        },
+        "required": ["url"],
+        "type": "object"
+      },
+      "OpenApiTag": {
+        "additionalProperties": false,
+        "properties": {
+          "description": { "maxLength": 1000, "type": "string" },
+          "name": { "maxLength": 100, "minLength": 1, "type": "string" }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "Order": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": { "$ref": "#/components/schemas/OrderItem" },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          },
+          "orderNumber": {
+            "maxLength": 28,
+            "minLength": 12,
+            "pattern": "^ORD-[A-Z0-9]{8,24}$",
+            "type": "string"
+          },
+          "placedAt": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          },
+          "shipping": { "$ref": "#/components/schemas/Money" },
+          "status": {
+            "enum": [
+              "pending",
+              "confirmed",
+              "processing",
+              "shipped",
+              "delivered",
+              "cancelled"
+            ],
+            "maxLength": 16,
+            "type": "string"
+          },
+          "subtotal": { "$ref": "#/components/schemas/Money" },
+          "tax": { "$ref": "#/components/schemas/Money" },
+          "total": { "$ref": "#/components/schemas/Money" },
+          "updatedAt": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          }
+        },
+        "required": [
+          "orderNumber",
+          "status",
+          "items",
+          "subtotal",
+          "shipping",
+          "tax",
+          "total",
+          "placedAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "OrderItem": {
+        "additionalProperties": false,
+        "properties": {
+          "lineTotal": { "$ref": "#/components/schemas/Money" },
+          "productName": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "productSlug": { "maxLength": 128, "minLength": 1, "type": "string" },
+          "quantity": { "maximum": 999, "minimum": 1, "type": "integer" },
+          "sku": { "maxLength": 80, "minLength": 1, "type": "string" },
+          "unitPrice": { "$ref": "#/components/schemas/Money" },
+          "variantId": { "maxLength": 64, "minLength": 5, "type": "string" },
+          "variantName": { "maxLength": 160, "minLength": 1, "type": "string" }
+        },
+        "required": [
+          "variantId",
+          "sku",
+          "productSlug",
+          "productName",
+          "variantName",
+          "quantity",
+          "unitPrice",
+          "lineTotal"
+        ],
+        "type": "object"
+      },
+      "OrderPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": { "$ref": "#/components/schemas/Order" },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "Product": {
+        "additionalProperties": false,
+        "properties": {
+          "category": { "maxLength": 80, "minLength": 1, "type": "string" },
+          "createdAt": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          },
+          "description": { "maxLength": 5000, "type": "string" },
+          "id": {
+            "maxLength": 64,
+            "minLength": 6,
+            "pattern": "^prod_[A-Za-z0-9]+$",
+            "type": "string"
+          },
+          "images": {
+            "items": { "$ref": "#/components/schemas/ProductImage" },
+            "maxItems": 12,
+            "type": "array"
+          },
+          "name": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "slug": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+            "type": "string"
+          },
+          "status": {
+            "enum": ["draft", "active", "archived"],
+            "maxLength": 16,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "maxLength": 40,
+            "minLength": 20,
+            "type": "string"
+          },
+          "variants": {
+            "items": { "$ref": "#/components/schemas/ProductVariant" },
+            "maxItems": 100,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "description",
+          "category",
+          "status",
+          "images",
+          "variants",
+          "createdAt",
+          "updatedAt"
+        ],
+        "type": "object"
+      },
+      "ProductImage": {
+        "additionalProperties": false,
+        "properties": {
+          "alt": { "maxLength": 300, "type": "string" },
+          "url": {
+            "format": "uri-reference",
+            "maxLength": 2048,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": ["url", "alt"],
+        "type": "object"
+      },
+      "ProductOption": {
+        "additionalProperties": false,
+        "properties": {
+          "name": { "maxLength": 80, "minLength": 1, "type": "string" },
+          "value": { "maxLength": 120, "minLength": 1, "type": "string" }
+        },
+        "required": ["name", "value"],
+        "type": "object"
+      },
+      "ProductPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": { "$ref": "#/components/schemas/Product" },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "nextCursor": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["items", "nextCursor"],
+        "type": "object"
+      },
+      "ProductVariant": {
+        "additionalProperties": false,
+        "properties": {
+          "availableQuantity": {
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "maxLength": 64,
+            "minLength": 5,
+            "pattern": "^var_[A-Za-z0-9]+$",
+            "type": "string"
+          },
+          "name": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "options": {
+            "items": { "$ref": "#/components/schemas/ProductOption" },
+            "maxItems": 10,
+            "type": "array"
+          },
+          "price": { "$ref": "#/components/schemas/Money" },
+          "sku": { "maxLength": 80, "minLength": 1, "type": "string" }
+        },
+        "required": [
+          "id",
+          "sku",
+          "name",
+          "options",
+          "price",
+          "availableQuantity"
+        ],
+        "type": "object"
+      },
+      "SetCartItemQuantityInput": {
+        "additionalProperties": false,
+        "properties": {
+          "quantity": {
+            "description": "Desired final cart quantity. Zero removes the item.",
+            "maximum": 999,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["quantity"],
+        "type": "object"
+      },
+      "SetInventoryLevelInput": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedVersion": {
+            "description": "Inventory version observed before this update.",
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "quantity": {
+            "description": "Desired final on-hand quantity, not an adjustment.",
+            "maximum": 1000000,
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": ["quantity", "expectedVersion"],
+        "type": "object"
+      },
+      "UpdateProductInput": {
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "category": { "maxLength": 80, "minLength": 1, "type": "string" },
+          "description": { "maxLength": 5000, "type": "string" },
+          "imageUrls": {
+            "items": {
+              "format": "uri-reference",
+              "maxLength": 2048,
+              "minLength": 1,
+              "type": "string"
+            },
+            "maxItems": 12,
+            "type": "array"
+          },
+          "name": { "maxLength": 160, "minLength": 1, "type": "string" },
+          "status": {
+            "enum": ["draft", "active", "archived"],
+            "maxLength": 16,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "bearerFormat": "JWT",
+        "description": "A short-lived commerce access token.",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Canonical private API contract for browsing desk and home products, managing the authenticated customer's cart and orders, and administering products and inventory. Customer identity and authorization are always derived from the bearer token.",
+    "title": "Desk and Home Commerce API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/health": {
+      "get": {
+        "description": "Reports whether the commerce API is ready to serve traffic.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthStatus" }
+              }
+            },
+            "description": "The service is healthy."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthStatus" }
+              }
+            },
+            "description": "The service is not ready to serve traffic."
+          }
+        },
+        "security": [],
+        "summary": "Get service health",
+        "tags": ["System"]
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "description": "Returns the canonical OpenAPI document served by this API.",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OpenApiDocument" }
+              }
+            },
+            "description": "The canonical OpenAPI 3.1 document."
+          }
+        },
+        "security": [],
+        "summary": "Get the OpenAPI contract",
+        "tags": ["System"]
+      }
+    },
+    "/api/v1/admin/inventory": {
+      "get": {
+        "description": "Lists bounded inventory records for an authenticated administrator.",
+        "operationId": "listInventory",
+        "parameters": [
+          { "$ref": "#/components/parameters/LimitQuery" },
+          { "$ref": "#/components/parameters/CursorQuery" },
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/LowStockQuery" }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InventoryPage" }
+              }
+            },
+            "description": "A bounded page of inventory records."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "List inventory",
+        "tags": ["Admin"]
+      }
+    },
+    "/api/v1/admin/inventory/{variantId}": {
+      "put": {
+        "description": "Sets the desired absolute on-hand quantity for a variant. expectedVersion provides optimistic concurrency control and must match the current record version. Quantity is never interpreted as an adjustment.",
+        "operationId": "setInventoryLevel",
+        "parameters": [{ "$ref": "#/components/parameters/VariantIdPath" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetInventoryLevelInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/InventoryItem" }
+              }
+            },
+            "description": "The updated inventory record with its new version."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "Set an inventory level",
+        "tags": ["Admin"]
+      }
+    },
+    "/api/v1/admin/products/{productId}": {
+      "patch": {
+        "description": "Updates mutable catalog fields for a product.",
+        "operationId": "updateProduct",
+        "parameters": [{ "$ref": "#/components/parameters/ProductIdPath" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateProductInput" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Product" }
+              }
+            },
+            "description": "The updated product."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "Update a product",
+        "tags": ["Admin"]
+      }
+    },
+    "/api/v1/cart": {
+      "get": {
+        "description": "Gets the cart belonging to the authenticated customer.",
+        "operationId": "getCurrentCart",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Cart" }
+              }
+            },
+            "description": "The authenticated customer's cart."
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "Get the current cart",
+        "tags": ["Cart"]
+      }
+    },
+    "/api/v1/cart/items/{variantId}": {
+      "put": {
+        "description": "Sets the desired absolute quantity for a variant in the authenticated customer's cart. A quantity of zero removes the item. This operation never interprets quantity as an increment or decrement.",
+        "operationId": "setCartItemQuantity",
+        "parameters": [{ "$ref": "#/components/parameters/VariantIdPath" }],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetCartItemQuantityInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Cart" }
+              }
+            },
+            "description": "The updated cart."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "Set a cart item quantity",
+        "tags": ["Cart"]
+      }
+    },
+    "/api/v1/orders": {
+      "get": {
+        "description": "Lists orders belonging to the authenticated customer.",
+        "operationId": "listCurrentCustomerOrders",
+        "parameters": [
+          { "$ref": "#/components/parameters/LimitQuery" },
+          { "$ref": "#/components/parameters/CursorQuery" }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/OrderPage" }
+              }
+            },
+            "description": "A bounded page of the authenticated customer's orders."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "List current customer orders",
+        "tags": ["Orders"]
+      }
+    },
+    "/api/v1/orders/{orderNumber}": {
+      "get": {
+        "description": "Gets an order by number only when it belongs to the authenticated customer.",
+        "operationId": "getCurrentCustomerOrder",
+        "parameters": [{ "$ref": "#/components/parameters/OrderNumberPath" }],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Order" }
+              }
+            },
+            "description": "The requested customer order."
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "Get a current customer order",
+        "tags": ["Orders"]
+      }
+    },
+    "/api/v1/products": {
+      "get": {
+        "description": "Lists active products for web and customer callers. Admin callers can also see draft and archived products.",
+        "operationId": "listProducts",
+        "parameters": [
+          { "$ref": "#/components/parameters/LimitQuery" },
+          { "$ref": "#/components/parameters/CursorQuery" },
+          { "$ref": "#/components/parameters/SearchQuery" },
+          { "$ref": "#/components/parameters/CategoryQuery" },
+          { "$ref": "#/components/parameters/InStockQuery" }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProductPage" }
+              }
+            },
+            "description": "A bounded page of products."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "List products",
+        "tags": ["Catalog"]
+      }
+    },
+    "/api/v1/products/{slug}": {
+      "get": {
+        "description": "Gets an active product by slug for web and customer callers. Admin callers can also retrieve draft and archived products.",
+        "operationId": "getProduct",
+        "parameters": [{ "$ref": "#/components/parameters/SlugPath" }],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Product" }
+              }
+            },
+            "description": "The requested product."
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        },
+        "summary": "Get a product",
+        "tags": ["Catalog"]
+      }
+    }
+  },
+  "security": [{ "bearerAuth": [] }],
+  "servers": [{ "url": "/" }],
+  "tags": [
+    {
+      "description": "Customer-visible product catalog operations.",
+      "name": "Catalog"
+    },
+    {
+      "description": "Operations on the authenticated customer's cart.",
+      "name": "Cart"
+    },
+    {
+      "description": "Operations on the authenticated customer's orders.",
+      "name": "Orders"
+    },
+    {
+      "description": "Administrative product and inventory operations.",
+      "name": "Admin"
+    },
+    {
+      "description": "Service health and contract discovery endpoints.",
+      "name": "System"
+    }
+  ]
+}

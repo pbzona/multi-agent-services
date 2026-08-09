@@ -4,17 +4,35 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "dev:services": "cross-env PORTLESS_PORT=443 portless run --name multi-eve node scripts/vercel-dev.mjs",
+    "dev:services:raw": "node scripts/vercel-dev.mjs",
+    "ai:costs": "node scripts/run-with-env.mjs node scripts/ai-cost-report.mjs",
+    "portless:doctor": "cross-env PORTLESS_PORT=443 portless doctor",
+    "portless:proxy": "portless proxy start --port 443",
+    "portless:stop": "portless proxy stop",
     "lint": "turbo run lint",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "check-types": "turbo run check-types"
+    "format": "prettier --write \"**/*.{css,js,json,md,mjs,ts,tsx,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{css,js,json,md,mjs,ts,tsx,yaml,yml}\"",
+    "check-types": "turbo run check-types",
+    "test": "turbo run test",
+    "eval": "pnpm --filter customer-agent eval && pnpm --filter admin-agent eval",
+    "openapi:generate": "pnpm --filter @repo/commerce-contract openapi:generate",
+    "openapi:check": "pnpm --filter @repo/commerce-contract openapi:check",
+    "db:generate": "node scripts/run-with-env.mjs pnpm --filter commerce db:generate",
+    "db:migrate": "node scripts/run-with-env.mjs pnpm --filter commerce db:migrate",
+    "db:seed": "node scripts/run-with-env.mjs pnpm --filter commerce db:seed"
   },
   "devDependencies": {
+    "ai": "7.0.52",
+    "cross-env": "10.1.0",
+    "portless": "0.15.5",
     "prettier": "^3.7.4",
     "turbo": "^2.10.8",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "vercel": "56.4.0"
   },
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@10.26.1",
   "engines": {
-    "node": ">=18"
+    "node": "24.x"
   }
 }

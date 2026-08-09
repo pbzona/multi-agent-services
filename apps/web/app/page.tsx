@@ -1,102 +1,114 @@
-import Image, { type ImageProps } from "next/image";
-import { Button } from "@repo/ui/button";
-import styles from "./page.module.css";
+import Link from "next/link";
+import { listProducts, type Product } from "./_lib/commerce";
+import { ProductArtwork } from "./_components/product-artwork";
+import { ProductCard } from "./_components/product-card";
+import { ArrowIcon } from "./_components/icons";
+import { EmptyState, ServiceError } from "./_components/ui-states";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
+export const dynamic = "force-dynamic";
+
+const HERO_FALLBACK = {
+  name: "Horizon Standing Desk",
+  slug: "horizon-standing-desk",
 };
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+export default async function HomePage() {
+  let products: Product[] = [];
+  let loadFailed = false;
+
+  try {
+    products = await listProducts();
+  } catch {
+    loadFailed = true;
+  }
+
+  const heroProduct = products[0] ?? HERO_FALLBACK;
 
   return (
     <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
-  );
-};
-
-export default function Home() {
-  return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      <section className="hero">
+        <div className="hero-inner">
+          <div className="hero-copy">
+            <p className="eyebrow">Desk / Home - Edition 01</p>
+            <h1 className="display-title">Objects for focused rooms.</h1>
+            <p>
+              A concise collection for the places where work and daily life
+              meet. Useful, durable, and deliberately quiet.
+            </p>
+            <Link className="button button-primary" href="#catalog">
+              View the collection
+              <ArrowIcon />
+            </Link>
+          </div>
+          <div className="hero-visual">
+            <ProductArtwork
+              name={heroProduct.name}
+              size="detail"
+              slug={heroProduct.slug}
             />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.dev/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+            <div className="hero-index">
+              <span>Form 001</span>
+              <span>{heroProduct.name}</span>
+            </div>
+          </div>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+      </section>
+
+      <section className="catalog-section page-shell" id="catalog">
+        <div className="section-heading">
+          <div className="section-heading-copy">
+            <p className="eyebrow">Current collection</p>
+            <h2 className="section-title">Desk and home</h2>
+          </div>
+          <span className="section-count">
+            {products.length || "-"} objects
+          </span>
+        </div>
+
+        {loadFailed ? <ServiceError /> : null}
+        {!loadFailed && products.length === 0 ? (
+          <EmptyState
+            actionHref="/"
+            actionLabel="Refresh catalog"
+            description="The collection is being prepared. Check back shortly."
+            title="No objects are published yet"
           />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.dev?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.dev →
-        </a>
-      </footer>
-    </div>
+        ) : null}
+        {products.length > 0 ? (
+          <div className="product-grid">
+            {products.map((product: Product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        ) : null}
+
+        <div className="store-values">
+          <article className="store-value">
+            <span className="store-value-index">01 / Utility</span>
+            <h3>Made for daily use</h3>
+            <p>
+              Simple materials and repairable details, selected for years rather
+              than seasons.
+            </p>
+          </article>
+          <article className="store-value">
+            <span className="store-value-index">02 / Scale</span>
+            <h3>Room-conscious</h3>
+            <p>
+              Proportions that work in a dedicated studio or at the edge of a
+              living room.
+            </p>
+          </article>
+          <article className="store-value">
+            <span className="store-value-index">03 / Support</span>
+            <h3>Ask before deciding</h3>
+            <p>
+              Use the store agent to compare options, check stock, or update
+              your cart.
+            </p>
+          </article>
+        </div>
+      </section>
+    </>
   );
 }

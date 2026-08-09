@@ -1,0 +1,38 @@
+{
+  "name": "commerce",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "cross-env PORTLESS_PORT=443 portless",
+    "dev:app": "node ../../scripts/run-with-env.mjs nitro dev",
+    "build": "nitro build",
+    "start": "node .output/server/index.mjs",
+    "preview": "nitro preview",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0 .",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:seed": "node --experimental-strip-types server/db/seed.ts"
+  },
+  "dependencies": {
+    "@repo/commerce-contract": "workspace:*",
+    "@repo/demo-auth": "workspace:*",
+    "drizzle-orm": "^0.45.2",
+    "nitro": "3.0.260610-beta",
+    "postgres": "^3.4.9",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@types/node": "24.x",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9.39.1",
+    "typescript": "5.9.2",
+    "vitest": "^4.1.0"
+  }
+}

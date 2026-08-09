@@ -1,0 +1,35 @@
+{
+  "name": "customer-agent",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "imports": {
+    "#*": "./agent/*",
+    "#evals/*": "./evals/*"
+  },
+  "scripts": {
+    "build": "eve build",
+    "dev": "cross-env PORTLESS_PORT=443 portless",
+    "dev:app": "node ../../scripts/run-with-env.mjs eve dev",
+    "start": "eve start",
+    "check-types": "tsc --noEmit",
+    "lint": "tsc --noEmit",
+    "eval": "node ../../scripts/run-with-env.mjs eve eval",
+    "eval:list": "node ../../scripts/run-with-env.mjs eve eval --list",
+    "eval:strict": "node ../../scripts/run-with-env.mjs eve eval --strict"
+  },
+  "dependencies": {
+    "@repo/commerce-contract": "workspace:*",
+    "@repo/demo-auth": "workspace:*",
+    "ai": "^7.0.38",
+    "eve": "^0.29.5",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.x",
+    "typescript": "7.0.2"
+  }
+}

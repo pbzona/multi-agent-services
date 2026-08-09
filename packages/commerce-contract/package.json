@@ -1,0 +1,28 @@
+{
+  "name": "@repo/commerce-contract",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./openapi.json": "./src/openapi.generated.json"
+  },
+  "scripts": {
+    "openapi:generate": "node scripts/generate-openapi.mjs",
+    "openapi:check": "node scripts/generate-openapi.mjs --check",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0 .",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@repo/eslint-config": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "24.x",
+    "eslint": "^9.39.1",
+    "openapi-typescript": "7.10.1",
+    "prettier": "3.7.4",
+    "typescript": "5.9.2",
+    "vitest": "^4.1.0",
+    "yaml": "2.8.3"
+  }
+}
